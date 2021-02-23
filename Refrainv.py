@@ -474,7 +474,7 @@ class Sisref(Frame):
 
     def tomo_openTT(self):
         if self.tomo_TTplot:
-            messagebox.showinfo('Refrapy','A tomographic analysis is already happening\nTo start a new one, please restart the current analysis.')
+            messagebox.showinfo('Refrapy','A tomographic analysis is already underway\nTo re-start, please stop the current analysis.')
         else:
             from pygimli.physics import Refraction
             import pygimli as pg
@@ -597,7 +597,7 @@ class Sisref(Frame):
                         self.pars.append(float(i.split()[1]))
                 messagebox.showinfo('Refrapy',"Tomography inversion parameters loaded successfully!")
             except:
-                messagebox.showinfo('Refrapy',"Invalid parameters! Please, check the file (in doubt view the Help menu)")
+                messagebox.showinfo('Refrapy',"Invalid parameters! Please, check the file (see the Help menu for more infomation)")
 
     def tomo_save(self):
         if self.cm:
@@ -794,7 +794,7 @@ class Sisref(Frame):
         self.TTfile_ext = False
         self.pars = []
         self.tt_raise()
-        messagebox.showinfo('Refrapy','All analysis have been restarted!')
+        messagebox.showinfo('Refrapy','Analysis has been restarted!')
 
 
     def tt_save(self):
@@ -827,7 +827,7 @@ class Sisref(Frame):
                             arq.write("%.2f %.2f\n"%(self.gp[i], self.depthLayer3[i]))
             self.tt_fig1.savefig('timeterms_layerInterpretation_%s-%s-%s__%sh%s.png'%(now.day, now.month, now.year, now.hour, now.minute))
             self.tt_fig3.savefig('timeterms_velocityModel_%s-%s-%s__%sh%s.png'%(now.day, now.month, now.year, now.hour, now.minute))
-            messagebox.showinfo('Refrapy',"All figures were saved and time-terms analysis results are in timeterms_%s-%s-%s__%sh%s.txt"%(now.day, now.month, now.year, now.hour, now.minute))
+            messagebox.showinfo('Refrapy',"All figures have been saved and time-terms analysis results are in timeterms_%s-%s-%s__%sh%s.txt"%(now.day, now.month, now.year, now.hour, now.minute))
 
     def tt_raise(self):
         self.tt_frame1.tkraise()
@@ -967,7 +967,7 @@ class Sisref(Frame):
     def tt_openTT(self):
         
         if self.tt_pltTT:
-            messagebox.showinfo('Refrapy','An analysis of travel-time curves is already happening\nTo start a new one, please clear the current analysis.')
+            messagebox.showinfo('Refrapy','Analysis of travel-time curves is underway\nTo re-start, please stop the current analysis.')
             
         else:
             #if ttFile != None:
@@ -1021,24 +1021,24 @@ class Sisref(Frame):
             self.tt_pltTT = True
             self.tt_pltVM = False
             self.tt_raise()
-            messagebox.showinfo('Refrapy','Travel-times file was loaded successfully!')
+            messagebox.showinfo('Refrapy','Travel-times file loaded successfully!')
 
     def tt_L1(self):
         if self.tt_interpretation:
             self.layer = 1
-            self.tt_ax1.set_title('Layer %d interpratation activated!'%self.layer)
+            self.tt_ax1.set_title('Layer %d interpretation activated!'%self.layer)
             self.tt_fig1.canvas.draw()
 
     def tt_L2(self):
         if self.tt_interpretation:
             self.layer = 2
-            self.tt_ax1.set_title('Layer %d interpratation activated!'%self.layer)
+            self.tt_ax1.set_title('Layer %d interpretation activated!'%self.layer)
             self.tt_fig1.canvas.draw()
 
     def tt_L3(self):
         if self.tt_interpretation:
             self.layer = 3
-            self.tt_ax1.set_title('Layer %d interpratation activated!'%self.layer)
+            self.tt_ax1.set_title('Layer %d interpretation activated!'%self.layer)
             self.tt_fig1.canvas.draw()
 
     def tt_clearInterpretation(self):
@@ -1058,7 +1058,7 @@ class Sisref(Frame):
 
         if self.tt_interpretation == False:
             self.tt_interpretation = True
-            self.tt_ax1.set_title('Layer %d interpratation activated!'%self.layer)
+            self.tt_ax1.set_title('Layer %d interpretation activated!'%self.layer)
                 
             def onpick(event):
                 art = event.artist
@@ -1119,7 +1119,7 @@ class Sisref(Frame):
                     self.layer = 2
                 elif event.key == "3":
                     self.layer = 3
-                self.tt_ax1.set_title('Layer %d interpratation activated!'%self.layer)
+                self.tt_ax1.set_title('Layer %d interpretation activated!'%self.layer)
                 
                 if event.key == "C" or event.key == "c":
                     if messagebox.askyesno("Refrainv", "Clear layer interpretation?"):
@@ -1135,13 +1135,13 @@ class Sisref(Frame):
 
             self.tt_pickEvent = self.tt_fig1.canvas.mpl_connect('pick_event', onpick)
             self.tt_keyEvent = self.tt_fig1.canvas.mpl_connect('key_press_event', onkey)
-            messagebox.showinfo('Refrapy','Layer interpretation is now activated!')
+            messagebox.showinfo('Refrapy','Layer interpretation activated!')
             self.tt_raise()
 
         else:
             self.tt_fig1.canvas.mpl_disconnect(self.tt_pickEvent)
             self.tt_fig1.canvas.mpl_disconnect(self.tt_keyEvent)
-            self.tt_ax1.set_title('Layer interpratation off')
+            self.tt_ax1.set_title('Layer interpretation off')
             messagebox.showinfo('Refrapy','Layer interpretation is now off!')
             self.tt_raise()
             self.tt_interpretation = False

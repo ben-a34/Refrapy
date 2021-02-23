@@ -2,3 +2,4 @@ conda create -n refrapy python=3.7.7 -> create a virtual env for Refrapy with Py
 conda activate refrapy -> activate virtual env
 conda install obspy -> install latest obspy release
 conda install -c gimli -c conda-forge pygimli=1.0.12 -> install pyGIMLi v1.0.12
+conda install python.app -> (for mac) install and run using pythonw

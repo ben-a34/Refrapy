@@ -1,11 +1,19 @@
+# Changelog
+# Added Mac compatibilty by changing =='Linux' to !='Windows'
+# Added zerophase to filtering (to avoid time-shift)
+# Added compatibility for multi-length streams
+# Added compatibility for stream-specific geophone_1
+# dded compatibility for stream-specific geophone spacing
+#
+
 from tkinter import *
 from tkinter import filedialog, messagebox
 from obspy import read
-import matplotlib                                                                
+import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.backend_bases import key_press_handler
-import os                                                                              
+import os
 import numpy as np
 from scipy import stats,arange
 import sys
@@ -16,7 +24,7 @@ warnings.filterwarnings('ignore')
 
 class Sispick(Frame):
 
-    def __init__(self, master, *args, **kwargs):                         
+    def __init__(self, master, *args, **kwargs):
 
         Frame.__init__(self, master)
         self.grid(row = 0, column = 0, sticky = NSEW)
@@ -77,10 +85,10 @@ class Sispick(Frame):
         root.bind('<Left>', lambda x: self.backpage())
         root.bind('<Right>', lambda x: self.nextpage())
         root.protocol("WM_DELETE_WINDOW", self.fechar)
-    
+
 
     def menus(self):
-        
+
         menuBar = Menu(root)
         fileMenu = Menu(menuBar)
         menuBar.add_cascade(label = 'File', menu = fileMenu)
@@ -134,9 +142,9 @@ class Sispick(Frame):
         editMenu.add_command(label='Clear picks <CTRL+L>',
                                      command=self.limparplot)
         editMenu.add_separator()
-        editMenu.add_command(label='Trim section lenght <A>',
+        editMenu.add_command(label='Trim section length <A>',
                                  command=self.pickAmostra)
-        editMenu.add_command(label='Use default section lenght <ALT+A>',
+        editMenu.add_command(label='Use default section length <ALT+A>',
                                          command=self.amostrasDefault)
         editMenu.add_separator()
         editMenu.add_command(label='Enable/disable pick lines <L>',
@@ -191,7 +199,7 @@ class Sispick(Frame):
         self.img_opt = PhotoImage(file="%s/imagens/opt.gif"%os.getcwd())
         self.img_header = PhotoImage(file="%s/imagens/header.gif"%os.getcwd())
         self.img_fechar = PhotoImage(file="%s/imagens/fechar.gif"%os.getcwd())
-        root.tk.call('wm', 'iconphoto', root._w, self.img_pick) 
+        root.tk.call('wm', 'iconphoto', root._w, self.img_pick)
 
     def buttons(self):
 
@@ -236,7 +244,7 @@ class Sispick(Frame):
         somb_neg.grid(row=0,column=12,sticky=W)
         somb_pos = Button(self, command = self.sombPos)
         somb_pos.config(image=self.img_sombpos)
-        somb_pos.grid(row=0,column=13,sticky=W) 
+        somb_pos.grid(row=0,column=13,sticky=W)
         clipar = Button(self, command = self.clip)
         clipar.config(image=self.img_clip)
         clipar.grid(row=0,column=14,sticky=W)
@@ -295,14 +303,14 @@ class Sispick(Frame):
         self.ganho, self.filtros,self.filtrosHP, self.filtrosLP, self.copiasCruas, self.copiasNorms, self.okpicks, self.clips, \
         self.sombreamentos, self.picks, self.picksArts, self.coordx, self.coordy, self.conPickClick, self.conPickMov, self.conPickSoltar, \
         self.conVelClick, self.conVelMov, self.conVelSoltar, self.conAmostra, self.ndados, self.linhasPick, self.freqLP, \
-        self.freqHP = [],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[], \
-        [],[],[],[],[],[],[],[]
+        self.freqHP, self.canais, self.valordx, self.posicaoGeof1 = [],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[], \
+        [],[],[],[],[],[],[],[], [], [], []
         self.sublinhas, self.bolas, self.indicadores, self.plotArts, self.sombArts, self.coordsx, self.coordsy, self.linhasVel, \
         self.textoVel, self.tracosMax = {},{},{},{},{},{}, {}, {}, {}, {}
         self.plotExiste, self.pickMode, self.yinvertido, self.normalizado, self.optAberto, self.pickAmostraAtivado, self.clickOn, \
         self.pickVelOn = False,False,False,False,False,False,False,False
-        self.arquivos, self.formato, self.posicaoGeof1, self.eventCon, self.pagina, self.recordlen, self.valordx, self.linhaVel, self.linhaPick, \
-        self.valorFigx, self.valorFigy = None,None,None,None,None,None,None,None,None,None,None
+        self.arquivos, self.formato, self.eventCon, self.pagina, self.recordlen, self.linhaVel, self.linhaPick, \
+        self.valorFigx, self.valorFigy = None,None,None,None,None,None,None,None,None
         self.fatorY, self.valorGanho, self.fatorLP, self.fatorHP = 0.8, 2, 0.8, 1.5
 
     def mplConfig(self):
@@ -314,7 +322,7 @@ class Sispick(Frame):
         plt.rcParams['keymap.pan'] = 'm,M'
 
     def fechar(self):
-        
+
         if self.plotExiste == True:
             self.fecharPlot()
             self.destroy()
@@ -324,10 +332,10 @@ class Sispick(Frame):
             self.destroy()
             root.destroy()
             sys.exit()
-            
+
     def abrirSismogramas(self):
-        
-        if self.plotExiste == False:    
+
+        if self.plotExiste == False:
             self.arquivos = sorted(filedialog.askopenfilenames(title='Open',
                                                                filetypes=[('seg2','*.dat'),
                                                                 ('SG2','*.sg2'),
@@ -339,48 +347,51 @@ class Sispick(Frame):
                 for i in range(len(self.arquivos)):
                     self.sts.append(read(self.arquivos[i]))
                     self.ndados.append(len(self.sts[i][0]))
+                    self.valordx.append(2)
+                    self.canais.append(0)
+                    self.posicaoGeof1.append(0)
                     if self.sts[i][0].stats._format == 'SEG2':
                         self.formato = 'seg2'
-                        try: 
+                        try:
                             self.listSource.append(self.sts[i][0].stats.seg2['SOURCE_LOCATION'])
                         except:
-                            messagebox.showinfo('Refrapy','Source positions not found, so 999 m will be used.\nTo change values go to Options > Edit section info')
+                            messagebox.showinfo('Refrapy','Source positions not found: 999 m will be used.\nTo change values go to Options > Edit section info')
                             self.listSource.append(999)
                         try:
-                            self.posicaoGeof1 = float(self.sts[i][0].stats.seg2['RECEIVER_LOCATION'])
+                            self.posicaoGeof1[i] = float(self.sts[i][0].stats.seg2['RECEIVER_LOCATION'])
                         except:
-                            self.posicaoGeof1 = 0
-                            messagebox.showinfo('Refrapy', 'First geophone position not found, so 0 m will be used.\nTo change values go to Options > Edit section info')
+                            self.posicaoGeof1[i] = 0
+                            messagebox.showinfo('Refrapy', 'First geophone position not found: 0 m will be used.\nTo change values go to Options > Edit section info')
                         try:
-                            self.valordx = float(self.sts[0][1].stats.seg2['RECEIVER_LOCATION'])-float(self.sts[0][0].stats.seg2['RECEIVER_LOCATION'])
+                            self.valordx[i] = float(self.sts[0][1].stats.seg2['RECEIVER_LOCATION'])-float(self.sts[0][0].stats.seg2['RECEIVER_LOCATION'])
                         except:
-                            messagebox.showinfo('Refrapy', 'Geophone spacing not found, so 2 m will be used.\nTo change values go to Options > Edit section info')
-                            self.valordx = 2
+                            messagebox.showinfo('Refrapy', 'Geophone spacing not found: 2 m will be used.\nTo change values go to Options > Edit section info')
+                            self.valordx[i] = 2
                     elif self.sts[i][0].stats._format == 'SEGY':
                         self.formato = 'segy'
                         try:
                             self.listSource.append(self.sts[i][0].stats.segy['SOURCE_LOCATION'])
                         except:
-                            messagebox.showinfo('Refrapy','Source positions not found, so 999 m will be used.\nTo change values go to Options > Edit section info')
+                            messagebox.showinfo('Refrapy','Source positions not found: 999 m will be used.\nTo change values go to Options > Edit section info')
                             self.listSource.append(999)
                         try:
-                            self.posicaoGeof1 = float(self.sts[i][0].stats.segy['RECEIVER_LOCATION'])
+                            self.posicaoGeof1[i] = float(self.sts[i][0].stats.segy['RECEIVER_LOCATION'])
                         except:
-                            self.posicaoGeof1 = 0
-                            messagebox.showinfo('Refrapy', 'First geophone position not found, so 0 m will be used.\nTo change values go to Options > Edit section info')
+                            self.posicaoGeof1[i] = 0
+                            messagebox.showinfo('Refrapy', 'First geophone position not found: 0 m will be used.\nTo change values go to Options > Edit section info')
                         try:
-                            self.valordx = float(self.sts[0][1].stats.segy['RECEIVER_LOCATION'][0])-float(self.sts[0][0].stats.segy['RECEIVER_LOCATION'][0])
+                            self.valordx[i] = float(self.sts[0][1].stats.segy['RECEIVER_LOCATION'][0])-float(self.sts[0][0].stats.segy['RECEIVER_LOCATION'][0])
                         except:
-                            messagebox.showinfo('Refrapy', 'Geophone spacing not found, so 2 m will be used.\nTo change values go to Options > Edit section info')
-                            self.valordx = 2 
+                            messagebox.showinfo('Refrapy', 'Geophone spacing not found: 2 m will be used.\nTo change values go to Options > Edit section info')
+                            self.valordx[i] = 2
                     else:
                         messagebox.showinfo('Refrapy', 'File format is not SEG2/SEGY.\nDefault values for geophones spacing, source and first geophone position were used.\nTo change values go to Options > Edit section info')
-                        self.valordx = 2
-                        self.posicaoGeof1 = 0
+                        self.valordx[i] = 2
+                        self.posicaoGeof1[i] = 0
                         self.listSource.append(999)
-                        
+
                 if self.ndados[0] > 10000:
-                    messagebox.showinfo('Refrapy','Traces have a great ammount of samples.\nTo speed up processing, you might want to consider trimming the sections lenght in Edit > Trim section lenght')
+                    messagebox.showinfo('Refrapy','Traces have a significant number of samples.\nTo speed up processing, you might want to consider trimming the sections length in Edit > Trim section length')
 
                 for i in range(len(self.arquivos)):
                     frame = Frame(root,bg='#F3F3F3')
@@ -396,6 +407,7 @@ class Sispick(Frame):
                     self.plotArts[i] = []
                     self.sombArts[i] = []
                     self.picks.append({})
+                    self.okpicks.append({})
                     self.picksArts.append({})
                     self.coordsx[i] = []
                     self.coordsy[i] = []
@@ -413,10 +425,10 @@ class Sispick(Frame):
                     self.conVelSoltar.append(None)
                     self.conAmostra.append(None)
                     for j in range(len(self.arquivos)):
-                        self.sublinhas[i].append(None)
-                    self.canais = len(self.sts[0])                      
+                        self.sublinhas[i].append(None) # self.sublinhas[j].append(None)?
+                    self.canais[i] = len(self.sts[i])
                     self.recordlen = self.sts[0][0].stats.endtime-self.sts[0][0].stats.starttime
-                    self.intervaloAmostragem = self.sts[0][0].stats.delta     
+                    self.intervaloAmostragem = self.sts[0][0].stats.delta
                     self.ganho.append(1)
                     self.clips.append(False)
                     self.sombreamentos.append('null')
@@ -427,21 +439,21 @@ class Sispick(Frame):
                     self.freqHP.append(5)
                     self.filtrosLP.append(False)
                     self.filtrosHP.append(False)
-                    self.tracosMax[i] = [max(self.sts[i][j]) for j in range(self.canais)]
-                    for j in range(self.canais):
+                    self.tracosMax[i] = [max(self.sts[i][j]) for j in range(self.canais[i])]
+                    for j in range(self.canais[i]):
                         self.dadosCrus[i][j] = self.sts[i][j].data/max(self.tracosMax[i])
                         self.dadosNorms[i][j] = self.sts[i][j].data/max(self.sts[i][j].data)
-                        self.okpicks.append(self.posicaoGeof1+self.valordx*j)
-                        self.ticksLabel.append(str(int(j*self.valordx)))
-                        traco, = self.axes[i].plot(self.dadosCrus[i][j][0:self.ndados[i]]*(-1)+self.posicaoGeof1+self.valordx*j,
+                        self.okpicks[i]=(self.posicaoGeof1[i]+self.valordx[i]*j)
+                        self.ticksLabel.append(str(int(j*self.valordx[i])))
+                        traco, = self.axes[i].plot(self.dadosCrus[i][j][0:self.ndados[i]]*(-1)+self.posicaoGeof1[i]+self.valordx[i]*j,
                                                    [self.sts[i][0].stats.delta*k*1000 for k in range(int(self.ndados[i]))],color='black')
                         self.plotArts[i].append(traco)
-                    plt.figure(i)    
-                    plt.title(' %s | %d channels'%(os.path.basename(self.arquivos[i]),int(self.canais)))     
+                    plt.figure(i)
+                    plt.title(' %s | %d channels'%(os.path.basename(self.arquivos[i]),int(self.canais[i])))
                     plt.xlabel('Distance (m)')
                     plt.ylabel('Time (ms)')
                     plt.ylim(0,1000*(self.sts[i][0].stats.delta*self.ndados[i]))
-                    plt.xlim(self.posicaoGeof1-self.valordx,self.posicaoGeof1+self.valordx*len(self.sts[i]))   
+                    plt.xlim(self.posicaoGeof1[i]-self.valordx[i],self.posicaoGeof1[i]+self.valordx[i]*len(self.sts[i]))
                     tela = FigureCanvasTkAgg(self.figs[i], self.frames[i])
                     self.telas.append(tela)
                     self.telas[i].draw()
@@ -450,7 +462,7 @@ class Sispick(Frame):
                     self.toolbars.append(toolbar)
                     self.toolbars[i].update()
                     self.telas[i]._tkcanvas.pack(fill='both', expand=True)
-                    
+
                 self.status.configure(text=' ')
                 self.frames[0].tkraise()
                 self.pagina = 0
@@ -465,10 +477,10 @@ class Sispick(Frame):
                 self.clickOn = False
                 self.pickVelOn = False
         else:
-            messagebox.showinfo('','Close the current sections to open a new one!')
+            messagebox.showinfo('','Close the current sections to open a new one')
 
     def nextpage(self):
-        
+
         if self.plotExiste == True and self.pagina < len(self.arquivos)-1:
             frame = self.frames[self.pagina+1]
             frame.tkraise()
@@ -485,8 +497,8 @@ class Sispick(Frame):
 
     def backpage(self):
 
-        if self.plotExiste == True and self.pagina != 0:  
-            frame = self.frames[self.pagina-1] 
+        if self.plotExiste == True and self.pagina != 0:
+            frame = self.frames[self.pagina-1]
             frame.tkraise()
             self.pagina -= 1
             self.telas[self.pagina].draw()
@@ -498,28 +510,28 @@ class Sispick(Frame):
                 self.statusPA.configure(text = '')
             if self.filtrosLP[self.pagina] != True:
                 self.statusPB.configure(text = '')
-                    
+
     def ativarPick(self):
-        
+
         if self.plotExiste == True:
             if self.pickMode == False:
                 self.pickMode = True
-                self.statusPick.configure(text=' Pick ativado',fg='blue')
-                
+                self.statusPick.configure(text=' Pick Active',fg='blue')
+
                 def pick(event):
                     try:
                         if event.button == 1:
-                            nearestMagnetValue = min(self.okpicks, key=lambda x: abs(event.xdata - x))
+                            nearestMagnetValue = min(self.okpicks[self.pagina], key=lambda x: abs(event.xdata - x))
                             if nearestMagnetValue in self.picks[self.pagina]:
                                 self.picks[self.pagina][nearestMagnetValue] = event.ydata
                                 self.picksArts[self.pagina][nearestMagnetValue].remove()
-                                pickline = self.axes[self.pagina].hlines(event.ydata,nearestMagnetValue-(self.valordx*0.5),
-                                                                    nearestMagnetValue+(self.valordx*0.5),colors='r',linestyle='solid')
+                                pickline = self.axes[self.pagina].hlines(event.ydata,nearestMagnetValue-(self.valordx[self.pagina]*0.5),
+                                                                    nearestMagnetValue+(self.valordx[self.pagina]*0.5),colors='r',linestyle='solid')
                                 self.picksArts[self.pagina][nearestMagnetValue] = pickline
-                                self.telas[self.pagina].draw()         
+                                self.telas[self.pagina].draw()
                             else:
-                                pickline = self.axes[self.pagina].hlines(event.ydata,nearestMagnetValue-(self.valordx*0.5),
-                                                                    nearestMagnetValue+(self.valordx*0.5),colors='r',linestyle='solid')
+                                pickline = self.axes[self.pagina].hlines(event.ydata,nearestMagnetValue-(self.valordx[self.pagina]*0.5),
+                                                                    nearestMagnetValue+(self.valordx[self.pagina]*0.5),colors='r',linestyle='solid')
                                 self.picksArts[self.pagina].update({nearestMagnetValue:pickline})
                                 self.picks[self.pagina].update({nearestMagnetValue:event.ydata})
                                 self.telas[self.pagina].draw()
@@ -529,14 +541,14 @@ class Sispick(Frame):
                                         sublinha, = self.axes[i].plot([key for key in sorted(self.picks[self.pagina])],
                                                 [self.picks[self.pagina][key] for key in sorted(self.picks[self.pagina])], color = 'green')
                                         self.sublinhas[i][self.pagina] = sublinha
-                                    else: 
+                                    else:
                                         self.sublinhas[i][self.pagina].set_data([key for key in sorted(self.picks[self.pagina])],
-                                                [self.picks[self.pagina][key] for key in sorted(self.picks[self.pagina])]) 
+                                                [self.picks[self.pagina][key] for key in sorted(self.picks[self.pagina])])
                             if self.indicadores[self.pagina]:
                                 for i in self.indicadores[self.pagina]:
-                                    if float(i.get_offsets()[0][0]) == nearestMagnetValue:  
+                                    if float(i.get_offsets()[0][0]) == nearestMagnetValue:
                                         i.remove()
-                                        self.telas[self.pagina].draw() 
+                                        self.telas[self.pagina].draw()
                         elif event.button == 3:
                             self.coordx.append(event.xdata)
                             self.coordy.append(event.ydata)
@@ -569,34 +581,34 @@ class Sispick(Frame):
                             self.coordy.append(event.ydata)
                             m, b = np.polyfit([int(i) for i in self.coordx], self.coordy, 1)
                             self.linhaPick.remove()
-                            valorMaisproximo1 = min(self.okpicks, key=lambda x: abs(self.coordx[0] - x))
-                            valorMaisproximo2 = min(self.okpicks, key=lambda x: abs(self.coordx[-1] - x))
+                            valorMaisproximo1 = min(self.okpicks[self.pagina], key=lambda x: abs(self.coordx[0] - x))
+                            valorMaisproximo2 = min(self.okpicks[self.pagina], key=lambda x: abs(self.coordx[-1] - x))
                             if valorMaisproximo1 < valorMaisproximo2:
-                                for i in arange(valorMaisproximo1,valorMaisproximo2+self.valordx, self.valordx):
-                                    if i in self.okpicks:
+                                for i in arange(valorMaisproximo1,valorMaisproximo2+self.valordx[self.pagina], self.valordx[self.pagina]):
+                                    if i in self.okpicks[self.pagina]:
                                         if i in self.picks[self.pagina]:
                                             self.picks[self.pagina][i] = m*i+b
                                             self.picksArts[self.pagina][i].remove()
-                                            pickline = self.axes[self.pagina].hlines(m*i+b,i-(self.valordx*0.5),
-                                                                                i+(self.valordx*0.5),colors='r',linestyle='solid')
+                                            pickline = self.axes[self.pagina].hlines(m*i+b,i-(self.valordx[self.pagina]*0.5),
+                                                                                i+(self.valordx[self.pagina]*0.5),colors='r',linestyle='solid')
                                             self.picksArts[self.pagina][i] = pickline
                                         else:
-                                            pickline = self.axes[self.pagina].hlines(m*i+b,i-(self.valordx*0.5),
-                                                                        i+(self.valordx*0.5),colors='r',linestyle='solid')
+                                            pickline = self.axes[self.pagina].hlines(m*i+b,i-(self.valordx[self.pagina]*0.5),
+                                                                        i+(self.valordx[self.pagina]*0.5),colors='r',linestyle='solid')
                                             self.picksArts[self.pagina].update({i:pickline})
                                             self.picks[self.pagina].update({i:m*i+b})
                             else:
-                                for i in arange(valorMaisproximo1,valorMaisproximo2-self.valordx, -self.valordx):
-                                    if i in self.okpicks:
+                                for i in arange(valorMaisproximo1,valorMaisproximo2-self.valordx[self.pagina], -self.valordx[self.pagina]):
+                                    if i in self.okpicks[self.pagina]:
                                         if i in self.picks[self.pagina]:
                                             self.picks[self.pagina][i] = m*i+b
                                             self.picksArts[self.pagina][i].remove()
-                                            pickline = self.axes[self.pagina].hlines(m*i+b,i-(self.valordx*0.5),
-                                                                                i+(self.valordx*0.5),colors='r',linestyle='solid')
+                                            pickline = self.axes[self.pagina].hlines(m*i+b,i-(self.valordx[self.pagina]*0.5),
+                                                                                i+(self.valordx[self.pagina]*0.5),colors='r',linestyle='solid')
                                             self.picksArts[self.pagina][i] = pickline
                                         else:
-                                            pickline = self.axes[self.pagina].hlines(m*i+b,i-(self.valordx*0.5),
-                                                                        i+(self.valordx*0.5),colors='r',linestyle='solid')
+                                            pickline = self.axes[self.pagina].hlines(m*i+b,i-(self.valordx[self.pagina]*0.5),
+                                                                        i+(self.valordx[self.pagina]*0.5),colors='r',linestyle='solid')
                                             self.picksArts[self.pagina].update({i:pickline})
                                             self.picks[self.pagina].update({i:m*i+b})
                             for i in range(len(self.arquivos)):
@@ -628,13 +640,13 @@ class Sispick(Frame):
                         self.conVelMov[i] = None
                         self.conVelSoltar[i] = None
                     self.pickVelOn = False
-                    self.statusVel.configure(text='',fg='blue') 
+                    self.statusVel.configure(text='',fg='blue')
                 if self.pickAmostraAtivado == True:
                     for i in range(len(self.arquivos)):
                         self.figs[self.pagina].canvas.mpl_disconnect(self.conAmostra[i])
                         self.conAmostra[i] = None
                     self.statusCortador.configure(text='', fg='blue')
-                    self.pickAmostraAtivado = False            
+                    self.pickAmostraAtivado = False
                 for i in range(len(self.arquivos)):
                     con1 = self.figs[i].canvas.mpl_connect('motion_notify_event', movimento)
                     con2 = self.figs[i].canvas.mpl_connect('button_release_event', soltar)
@@ -657,7 +669,7 @@ class Sispick(Frame):
 
         if self.plotExiste == True:
             root = Tk()
-            root.title('Refrapy - Sispick') 
+            root.title('Refrapy - Sispick')
             fig = plt.figure()
             ax = fig.add_subplot(111)
             for i in range(len(self.arquivos)):
@@ -681,7 +693,7 @@ class Sispick(Frame):
                         fig.canvas.draw()
                         self.figs[i].canvas.draw()
 
-            plt.title('Preview of travel time curves')    
+            plt.title('Preview of travel time curves')
             plt.xlabel('Distance (m)')
             plt.ylabel('Time (ms)')
             plt.grid()
@@ -720,10 +732,11 @@ class Sispick(Frame):
 
         if self.plotExiste == True:
             if len(self.picks[self.pagina]) > 0:
-                if messagebox.askyesno("Refrapy - Sispick", "Limpar picks do sismograma atual?"):
+                if messagebox.askyesno("Refrapy - Sispick", "Clear picks from the current traces?"):
                     for i in self.picksArts[self.pagina].values():
                         i.remove()
                     self.picks[self.pagina].clear()
+                    self.okpicks[self.pagina].clear()
                     self.picksArts[self.pagina].clear()
                     self.telas[self.pagina].draw()
                     if self.linhasPick[self.pagina] != None:
@@ -736,13 +749,13 @@ class Sispick(Frame):
                         else:
                             if self.sublinhas[i][self.pagina] != None:
                                 self.sublinhas[i][self.pagina].remove()
-                                self.sublinhas[i][self.pagina] = None    
+                                self.sublinhas[i][self.pagina] = None
                         self.telas[i].draw()
-                    
+
     def fecharPlot(self):
-          
+
         if self.plotExiste == True:
-            if messagebox.askyesno("Refrapy - Sispick", "Fechar o projeto atual?"):
+            if messagebox.askyesno("Refrapy - Sispick", "Close the current project?"):
                 for i in self.frames:
                     i.destroy()
                 for i in self.axes:
@@ -752,7 +765,7 @@ class Sispick(Frame):
                 del self.frames[:],self.figs[:],self.axes[:],self.telas[:],self.listSource[:],self.sts[:], \
                     self.ticksLabel[:],self.toolbars[:],self.dadosCrus[:],self.dadosNorms[:],self.ganho[:], \
                     self.filtros[:],self.filtrosHP[:],self.filtrosLP[:],self.copiasCruas[:],self.copiasNorms[:], \
-                    self.okpicks[:],self.clips[:],self.sombreamentos[:],self.picks[:],self.picksArts[:],self.ndados[:], \
+                    self.clips[:],self.sombreamentos[:],self.picks[:],self.picksArts[:],self.ndados[:], \
                     self.freqLP[:],self.freqHP[:],self.coordx[:],self.coordy[:],self.conPickClick[:], \
                     self.conPickMov[:],self.conPickSoltar[:],self.conVelClick[:],self.conVelMov[:],self.conVelSoltar[:], \
                     self.conAmostra[:]
@@ -768,8 +781,8 @@ class Sispick(Frame):
                 self.tracosMax.clear()
                 self.plotExiste, self.pickMode, self.yinvertido, self.normalizado, self.optAberto, self.pickAmostraAtivado, \
                 self.clickOn,self.pickVelOn = False,False,False,False,False,False,False,False
-                self.arquivos, self.formato, self.posicaoGeof1, self.eventCon, self.pagina, self.recordlen, self.valordx, self.linhaVel, \
-                self.linhaPick = None,None,None,None,None,None,None,None,None
+                self.arquivos, self.formato, self.eventCon, self.pagina, self.recordlen, self.linhaVel, \
+                self.linhaPick = None,None,None,None,None,None,None
                 self.fatorY, self.valorGanho, self.fatorLP, self.fatorHP = 0.8, 2, 0.8, 1.5
                 self.status.configure(text = '',fg='red')
                 self.statusPick.configure(text = '',fg='blue')
@@ -781,122 +794,122 @@ class Sispick(Frame):
     def conferidorIndividual(self):
 
         if self.clips[self.pagina] == True:
-            for j in range(self.canais):
-                self.plotArts[self.pagina][j].get_xdata()[self.plotArts[self.pagina][j].get_xdata() < self.posicaoGeof1+j*self.valordx-((self.valordx/2)*0.9)] = self.posicaoGeof1+j*self.valordx-((self.valordx/2)*0.9)
-                self.plotArts[self.pagina][j].get_xdata()[self.plotArts[self.pagina][j].get_xdata() > self.posicaoGeof1+j*self.valordx+((self.valordx/2)*0.9)] = self.posicaoGeof1+j*self.valordx+((self.valordx/2)*0.9)
+            for j in range(self.canais[self.pagina]):
+                self.plotArts[self.pagina][j].get_xdata()[self.plotArts[self.pagina][j].get_xdata() < self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina]-((self.valordx[self.pagina]/2)*0.9)] = self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina]-((self.valordx[self.pagina]/2)*0.9)
+                self.plotArts[self.pagina][j].get_xdata()[self.plotArts[self.pagina][j].get_xdata() > self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina]+((self.valordx[self.pagina]/2)*0.9)] = self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina]+((self.valordx[self.pagina]/2)*0.9)
                 self.plotArts[self.pagina][j].set_xdata(self.plotArts[self.pagina][j].get_xdata())
         if self.sombreamentos[self.pagina] == 'neg':
-            for j in range(self.canais):
-                self.sombArts[self.pagina][:].pop(j).remove()  
+            for j in range(self.canais[self.pagina]):
+                self.sombArts[self.pagina][:].pop(j).remove()
             del self.sombArts[self.pagina][:]
-            for j in range(self.canais):   
+            for j in range(self.canais[self.pagina]):
                 somb = self.axes[self.pagina].fill_betweenx(self.plotArts[self.pagina][j].get_ydata(),
-                            self.posicaoGeof1+self.valordx*j,
+                            self.posicaoGeof1[self.pagina]+self.valordx[self.pagina]*j,
                             self.plotArts[self.pagina][j].get_xdata(),
-                            where = self.plotArts[self.pagina][j].get_xdata() >= self.posicaoGeof1+j*self.valordx,color='black')
+                            where = self.plotArts[self.pagina][j].get_xdata() >= self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina],color='black')
                 self.sombArts[self.pagina].append(somb)
         elif self.sombreamentos[self.pagina] == 'pos':
-            for j in range(self.canais):
-                self.sombArts[self.pagina][:].pop(j).remove()    
+            for j in range(self.canais[self.pagina]):
+                self.sombArts[self.pagina][:].pop(j).remove()
             del self.sombArts[self.pagina][:]
-            for j in range(self.canais):      
+            for j in range(self.canais[self.pagina]):
                 somb = self.axes[self.pagina].fill_betweenx(self.plotArts[self.pagina][j].get_ydata(),
-                            self.posicaoGeof1+self.valordx*j,
+                            self.posicaoGeof1[self.pagina]+self.valordx[self.pagina]*j,
                             self.plotArts[self.pagina][j].get_xdata(),
-                            where = self.plotArts[self.pagina][j].get_xdata() <= self.posicaoGeof1+j*self.valordx,color='black')   
+                            where = self.plotArts[self.pagina][j].get_xdata() <= self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina],color='black')
                 self.sombArts[self.pagina].append(somb)
         self.figs[self.pagina].canvas.draw()
 
     def conferidorGeral(self):
 
-        for i in range(len(self.arquivos)):    
-            if self.clips[i] == True:   
-                for j in range(self.canais):
-                    self.plotArts[i][j].get_xdata()[self.plotArts[i][j].get_xdata() < self.posicaoGeof1+j*self.valordx-((self.valordx/2)*0.9)] = self.posicaoGeof1+j*self.valordx-((self.valordx/2)*0.9)
-                    self.plotArts[i][j].get_xdata()[self.plotArts[i][j].get_xdata() > self.posicaoGeof1+j*self.valordx+((self.valordx/2)*0.9)] = self.posicaoGeof1+j*self.valordx+((self.valordx/2)*0.9)
-                    self.plotArts[self.pagina][j].set_xdata(self.plotArts[self.pagina][j].get_xdata())   
+        for i in range(len(self.arquivos)):
+            if self.clips[i] == True:
+                for j in range(self.canais[i]):
+                    self.plotArts[i][j].get_xdata()[self.plotArts[i][j].get_xdata() < self.posicaoGeof1[i]+j*self.valordx[i]-((self.valordx[i]/2)*0.9)] = self.posicaoGeof1[i]+j*self.valordx[i]-((self.valordx[i]/2)*0.9)
+                    self.plotArts[i][j].get_xdata()[self.plotArts[i][j].get_xdata() > self.posicaoGeof1[i]+j*self.valordx[i]+((self.valordx[i]/2)*0.9)] = self.posicaoGeof1[i]+j*self.valordx[i]+((self.valordx[i]/2)*0.9)
+                    self.plotArts[self.pagina][j].set_xdata(self.plotArts[self.pagina][j].get_xdata())
             if self.sombreamentos[i] == 'neg':
-                for j in range(self.canais):
+                for j in range(self.canais[i]):
                     self.sombArts[i][:].pop(j).remove()
                 del self.sombArts[i][:]
-                for j in range(self.canais):  
+                for j in range(self.canais[i]):
                     somb = self.axes[i].fill_betweenx(self.plotArts[i][j].get_ydata(),
-                                self.posicaoGeof1+self.valordx*j,
+                                self.posicaoGeof1[i]+self.valordx[i]*j,
                                 self.plotArts[i][j].get_xdata(),
-                                where = self.plotArts[i][j].get_xdata() >= self.posicaoGeof1+j*self.valordx,color='black') 
+                                where = self.plotArts[i][j].get_xdata() >= self.posicaoGeof1[i]+j*self.valordx[i],color='black')
                     self.sombArts[i].append(somb)
             elif self.sombreamentos[i] == 'pos':
-                for j in range(self.canais):
-                    self.sombArts[i][:].pop(j).remove()           
+                for j in range(self.canais[i]):
+                    self.sombArts[i][:].pop(j).remove()
                 del self.sombArts[i][:]
-                for j in range(self.canais):          
+                for j in range(self.canais[i]):
                     somb = self.axes[i].fill_betweenx(self.plotArts[i][j].get_ydata(),
-                                self.posicaoGeof1+self.valordx*j,
+                                self.posicaoGeof1[i]+self.valordx[i]*j,
                                 self.plotArts[i][j].get_xdata(),
-                                where = self.plotArts[i][j].get_xdata() <= self.posicaoGeof1+j*self.valordx,color='black')   
+                                where = self.plotArts[i][j].get_xdata() <= self.posicaoGeof1[i]+j*self.valordx[i],color='black')
                     self.sombArts[i].append(somb)
             self.telas[i].draw()
 
     def ampup(self):
 
         if self.plotExiste == True:
-            self.ganho[self.pagina] += self.valorGanho
+            self.ganho[self.pagina] *= self.valorGanho
             if self.normalizado == True:
                 if self.filtros[self.pagina] != True:
-                    for j in range(self.canais):           
-                        self.plotArts[self.pagina][j].set_xdata(self.dadosNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx)
+                    for j in range(self.canais[self.pagina]):
+                        self.plotArts[self.pagina][j].set_xdata(self.dadosNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina])
                 else:
-                    for j in range(self.canais):      
-                        self.plotArts[self.pagina][j].set_xdata(self.copiasNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx) 
+                    for j in range(self.canais[self.pagina]):
+                        self.plotArts[self.pagina][j].set_xdata(self.copiasNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina])
             else:
                 if self.filtros[self.pagina] != True:
-                    for j in range(self.canais):
-                        self.plotArts[self.pagina][j].set_xdata(self.dadosCrus[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx)
+                    for j in range(self.canais[self.pagina]):
+                        self.plotArts[self.pagina][j].set_xdata(self.dadosCrus[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina])
                 else:
-                    for j in range(self.canais):     
-                        self.plotArts[self.pagina][j].set_xdata(self.copiasCruas[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx)
+                    for j in range(self.canais[self.pagina]):
+                        self.plotArts[self.pagina][j].set_xdata(self.copiasCruas[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina])
             self.conferidorIndividual()
 
     def ampdown(self):
 
-        if self.plotExiste == True and self.ganho[self.pagina] > self.valorGanho:
-            self.ganho[self.pagina] -= self.valorGanho
+        if self.plotExiste == True:
+            self.ganho[self.pagina] /= self.valorGanho
             if self.normalizado == True:
                 if self.filtros[self.pagina] != True:
-                    for j in range(self.canais):       
-                        self.plotArts[self.pagina][j].set_xdata(self.dadosNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx)
+                    for j in range(self.canais[self.pagina]):
+                        self.plotArts[self.pagina][j].set_xdata(self.dadosNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina])
                 else:
-                    for j in range(self.canais):          
-                        self.plotArts[self.pagina][j].set_xdata(self.copiasNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx)               
+                    for j in range(self.canais[self.pagina]):
+                        self.plotArts[self.pagina][j].set_xdata(self.copiasNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina])
             else:
                 if self.filtros[self.pagina] != True:
-                    for j in range(self.canais):
-                        self.plotArts[self.pagina][j].set_xdata(self.dadosCrus[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx)
+                    for j in range(self.canais[self.pagina]):
+                        self.plotArts[self.pagina][j].set_xdata(self.dadosCrus[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina])
                 else:
-                    for j in range(self.canais):
-                        self.plotArts[self.pagina][j].set_xdata(self.copiasCruas[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx)
+                    for j in range(self.canais[self.pagina]):
+                        self.plotArts[self.pagina][j].set_xdata(self.copiasCruas[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina])
             self.conferidorIndividual()
 
     def amostrasDefault(self):
 
         if self.plotExiste == True:
-            if int(self.ndados[self.pagina]) != int(len(self.sts[0][0])): 
-                if messagebox.askyesno('Refrapy - Sispick', 'Atualizar os plots para número de amostras original (%d)?'%int(len(self.sts[0][0]))):
+            if int(self.ndados[self.pagina]) != int(len(self.sts[0][0])):
+                if messagebox.askyesno('Refrapy - Sispick', 'Update plots to original number of samples (%d)?'%int(len(self.sts[0][0]))):
                     self.ndados[self.pagina] = int(len(self.sts[0][0]))
                     if self.normalizado == True:
-                        for j in range(self.canais):
-                            self.plotArts[self.pagina][j].set_data(self.dadosNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx,
+                        for j in range(self.canais[self.pagina]):
+                            self.plotArts[self.pagina][j].set_data(self.dadosNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina],
                                                          [self.sts[self.pagina][0].stats.delta*k*1000 for k in range(int(self.ndados[self.pagina]))])
                     else:
-                        for j in range(self.canais):                  
-                            self.plotArts[self.pagina][j].set_data(self.dadosCrus[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx,
+                        for j in range(self.canais[self.pagina]):
+                            self.plotArts[self.pagina][j].set_data(self.dadosCrus[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina],
                                                          [self.sts[self.pagina][0].stats.delta*k*1000 for k in range(int(self.ndados[self.pagina]))])
                     self.axes[self.pagina].set_ylim([0,1000*(self.sts[self.pagina][0].stats.delta*self.ndados[self.pagina])])
-                    if self.yinvertido == True:                      
+                    if self.yinvertido == True:
                         plt.figure(self.pagina)
                         plt.gca().invert_yaxis()
                     self.conferidorIndividual()
-                    
+
     def menosy(self):
 
         if self.plotExiste == True:
@@ -916,7 +929,7 @@ class Sispick(Frame):
                 plt.figure(self.pagina)
                 plt.gca().invert_yaxis()
             else:
-                self.axes[self.pagina].set_ylim([0,float(self.axes[self.pagina].get_ylim()[1])/self.fatorY]) 
+                self.axes[self.pagina].set_ylim([0,float(self.axes[self.pagina].get_ylim()[1])/self.fatorY])
             self.figs[self.pagina].canvas.draw()
 
     def normalizar(self):
@@ -925,18 +938,18 @@ class Sispick(Frame):
             if self.normalizado == False:
                 for i in range(len(self.arquivos)):
                     if self.filtros[i] != True:
-                        for j in range(self.canais):
-                            self.plotArts[i][j].set_xdata(self.dadosNorms[i][j][0:self.ndados[i]]*(-1)*self.ganho[i]+self.posicaoGeof1+j*self.valordx)
+                        for j in range(self.canais[i]):
+                            self.plotArts[i][j].set_xdata(self.dadosNorms[i][j][0:self.ndados[i]]*(-1)*self.ganho[i]+self.posicaoGeof1[i]+j*self.valordx[i])
                     else:
-                        messagebox.showinfo('','Retire os filtros aplicados no sismograma para normalizar os traços')
+                        messagebox.showinfo('','Remove applied filters to normalize traces')
                 self.normalizado = True
             else:
                 for i in range(len(self.arquivos)):
-                    if self.filtros[i] != True:                   
-                        for j in range(self.canais):
-                            self.plotArts[i][j].set_xdata(self.dadosCrus[i][j][0:self.ndados[i]]*(-1)*self.ganho[i]+self.posicaoGeof1+j*self.valordx)
+                    if self.filtros[i] != True:
+                        for j in range(self.canais[i]):
+                            self.plotArts[i][j].set_xdata(self.dadosCrus[i][j][0:self.ndados[i]]*(-1)*self.ganho[i]+self.posicaoGeof1[i]+j*self.valordx[i])
                     else:
-                        messagebox.showinfo('','Retire os filtros aplicados no sismograma para desnormalizar os traços')
+                        messagebox.showinfo('','Remove applied filters to denormalize traces')
                 self.normalizado = False
             self.conferidorGeral()
 
@@ -944,27 +957,27 @@ class Sispick(Frame):
 
         if self.plotExiste == True:
             if self.sombreamentos[self.pagina] == 'pos' or self.sombreamentos[self.pagina] == 'neg':
-                for j in range(self.canais):
-                    self.sombArts[self.pagina][:].pop(j).remove()  
+                for j in range(self.canais[self.pagina]):
+                    self.sombArts[self.pagina][:].pop(j).remove()
                 del self.sombArts[self.pagina][:]
                 self.figs[self.pagina].canvas.draw()
                 self.sombreamentos[self.pagina] = 'null'
-    
+
     def sombNeg(self):
 
         if self.plotExiste == True:
             if self.sombreamentos[self.pagina] == 'pos' or self.sombreamentos[self.pagina] == 'null':
                 try:
-                    for j in range(self.canais):
-                        self.sombArts[self.pagina][:].pop(j).remove()         
+                    for j in range(self.canais[self.pagina]):
+                        self.sombArts[self.pagina][:].pop(j).remove()
                     del self.sombArts[self.pagina][:]
                 except:
                     pass
-                for j in range(self.canais): 
+                for j in range(self.canais[self.pagina]):
                     somb = self.axes[self.pagina].fill_betweenx(self.plotArts[self.pagina][j].get_ydata(),
-                                self.posicaoGeof1+self.valordx*j,
+                                self.posicaoGeof1[self.pagina]+self.valordx[self.pagina]*j,
                                 self.plotArts[self.pagina][j].get_xdata(),
-                                where = self.plotArts[self.pagina][j].get_xdata() >= self.posicaoGeof1+j*self.valordx,color='black')     
+                                where = self.plotArts[self.pagina][j].get_xdata() >= self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina],color='black')
                     self.sombArts[self.pagina].append(somb)
                 self.sombreamentos[self.pagina] = 'neg'
                 self.figs[self.pagina].canvas.draw()
@@ -974,16 +987,16 @@ class Sispick(Frame):
         if self.plotExiste == True:
             if self.sombreamentos[self.pagina] == 'neg' or self.sombreamentos[self.pagina] == 'null':
                 try:
-                    for j in range(self.canais):
-                        self.sombArts[self.pagina][:].pop(j).remove()      
+                    for j in range(self.canais[self.pagina]):
+                        self.sombArts[self.pagina][:].pop(j).remove()
                     del self.sombArts[self.pagina][:]
                 except:
                     pass
-                for j in range(self.canais):   
+                for j in range(self.canais[self.pagina]):
                     somb = self.axes[self.pagina].fill_betweenx(self.plotArts[self.pagina][j].get_ydata(),
-                                self.posicaoGeof1+self.valordx*j,
+                                self.posicaoGeof1[self.pagina]+self.valordx[self.pagina]*j,
                                 self.plotArts[self.pagina][j].get_xdata(),
-                                where = self.plotArts[self.pagina][j].get_xdata() <= self.posicaoGeof1+j*self.valordx,color='black')    
+                                where = self.plotArts[self.pagina][j].get_xdata() <= self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina],color='black')
                     self.sombArts[self.pagina].append(somb)
                 self.sombreamentos[self.pagina] = 'pos'
                 self.figs[self.pagina].canvas.draw()
@@ -992,52 +1005,52 @@ class Sispick(Frame):
 
         if self.plotExiste == True:
             if self.clips[self.pagina] == False:
-                for j in range(self.canais):
-                    self.plotArts[self.pagina][j].get_xdata()[self.plotArts[self.pagina][j].get_xdata() < self.posicaoGeof1+j*self.valordx-((self.valordx/2)*0.9)] = self.posicaoGeof1+j*self.valordx-((self.valordx/2)*0.9)
-                    self.plotArts[self.pagina][j].get_xdata()[self.plotArts[self.pagina][j].get_xdata() > self.posicaoGeof1+j*self.valordx+((self.valordx/2)*0.9)] = self.posicaoGeof1+j*self.valordx+((self.valordx/2)*0.9)
+                for j in range(self.canais[self.pagina]):
+                    self.plotArts[self.pagina][j].get_xdata()[self.plotArts[self.pagina][j].get_xdata() < self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina]-((self.valordx[self.pagina]/2)*0.9)] = self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina]-((self.valordx[self.pagina]/2)*0.9)
+                    self.plotArts[self.pagina][j].get_xdata()[self.plotArts[self.pagina][j].get_xdata() > self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina]+((self.valordx[self.pagina]/2)*0.9)] = self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina]+((self.valordx[self.pagina]/2)*0.9)
                     self.plotArts[self.pagina][j].set_xdata(self.plotArts[self.pagina][j].get_xdata())
                 self.clips[self.pagina] = True
             else:
                 if self.normalizado == True:
-                    for j in range(self.canais):
-                        self.plotArts[self.pagina][j].set_xdata(self.dadosNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx)
+                    for j in range(self.canais[self.pagina]):
+                        self.plotArts[self.pagina][j].set_xdata(self.dadosNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina])
                 else:
-                    for j in range(self.canais):
-                        self.plotArts[self.pagina][j].set_xdata(self.dadosCrus[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx)
+                    for j in range(self.canais[self.pagina]):
+                        self.plotArts[self.pagina][j].set_xdata(self.dadosCrus[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina])
                 self.clips[self.pagina] = False
             if self.sombreamentos[self.pagina] == 'neg':
-                for j in range(self.canais):
-                    self.sombArts[self.pagina][:].pop(j).remove()      
+                for j in range(self.canais[self.pagina]):
+                    self.sombArts[self.pagina][:].pop(j).remove()
                 del self.sombArts[self.pagina][:]
-                for j in range(self.canais):      
+                for j in range(self.canais[self.pagina]):
                     somb = self.axes[self.pagina].fill_betweenx(self.plotArts[self.pagina][j].get_ydata(),
-                                self.posicaoGeof1+self.valordx*j,
+                                self.posicaoGeof1[self.pagina]+self.valordx[self.pagina]*j,
                                 self.plotArts[self.pagina][j].get_xdata(),
-                                where = self.plotArts[self.pagina][j].get_xdata() >= self.posicaoGeof1+j*self.valordx,color='black')   
+                                where = self.plotArts[self.pagina][j].get_xdata() >= self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina],color='black')
                     self.sombArts[self.pagina].append(somb)
             elif self.sombreamentos[self.pagina] == 'pos':
-                for j in range(self.canais):
-                    self.sombArts[self.pagina][:].pop(j).remove()       
+                for j in range(self.canais[self.pagina]):
+                    self.sombArts[self.pagina][:].pop(j).remove()
                 del self.sombArts[self.pagina][:]
-                for j in range(self.canais):        
+                for j in range(self.canais[self.pagina]):
                     somb = self.axes[self.pagina].fill_betweenx(self.plotArts[self.pagina][j].get_ydata(),
-                                self.posicaoGeof1+self.valordx*j,
+                                self.posicaoGeof1[self.pagina]+self.valordx[self.pagina]*j,
                                 self.plotArts[self.pagina][j].get_xdata(),
-                                where = self.plotArts[self.pagina][j].get_xdata() <= self.posicaoGeof1+j*self.valordx,color='black')      
+                                where = self.plotArts[self.pagina][j].get_xdata() <= self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina],color='black')
                     self.sombArts[self.pagina].append(somb)
             self.figs[self.pagina].canvas.draw()
-  
+
     def invert(self):
 
         if self.plotExiste == True:
             if self.yinvertido == False:
-                for i in range(len(self.arquivos)):   
+                for i in range(len(self.arquivos)):
                     plt.figure(i)
                     plt.gca().invert_yaxis()
                     self.figs[i].canvas.draw()
                 self.yinvertido = True
             elif self.yinvertido == True:
-                for i in range(len(self.arquivos)):    
+                for i in range(len(self.arquivos)):
                     plt.figure(i)
                     plt.gca().invert_yaxis()
                     self.figs[i].canvas.draw()
@@ -1048,12 +1061,12 @@ class Sispick(Frame):
         if self.plotExiste == True:
             if self.filtros[self.pagina] == True:
                 if self.normalizado == True:
-                    for j in range(self.canais):
-                        self.plotArts[self.pagina][j].set_xdata(self.dadosNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx)
+                    for j in range(self.canais[self.pagina]):
+                        self.plotArts[self.pagina][j].set_xdata(self.dadosNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina])
                     self.copiasNorms[self.pagina] = None
                 else:
-                    for j in range(self.canais):
-                        self.plotArts[self.pagina][j].set_xdata(self.dadosCrus[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx)
+                    for j in range(self.canais[self.pagina]):
+                        self.plotArts[self.pagina][j].set_xdata(self.dadosCrus[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina])
                     self.copiasCruas[self.pagina] = None
                 self.statusPA.configure(text = '')
                 self.statusPB.configure(text = '')
@@ -1071,28 +1084,28 @@ class Sispick(Frame):
             if self.normalizado == True:
                 if self.filtros[self.pagina] != True:
                     self.copiasNorms[self.pagina] = self.sts[self.pagina].copy().normalize()
-                    self.copiasNorms[self.pagina].filter("lowpass", freq = self.freqLP[self.pagina])
+                    self.copiasNorms[self.pagina].filter("lowpass", freq = self.freqLP[self.pagina], zerophase = True)
                     self.statusPB.configure(text = 'Low pass: %.2f Hz'%self.freqLP[self.pagina])
                     self.freqLP[self.pagina] = self.freqLP[self.pagina]*self.fatorLP
                 else:
-                    self.copiasNorms[self.pagina].filter("lowpass", freq = self.freqLP[self.pagina])
+                    self.copiasNorms[self.pagina].filter("lowpass", freq = self.freqLP[self.pagina], zerophase = True)
                     self.statusPB.configure(text = 'Low pass: %.2f Hz'%self.freqLP[self.pagina])
-                    self.freqLP[self.pagina] = self.freqLP[self.pagina]*self.fatorLP           
-                for j in range(self.canais):
-                    self.plotArts[self.pagina][j].set_xdata(self.copiasNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx)
+                    self.freqLP[self.pagina] = self.freqLP[self.pagina]*self.fatorLP
+                for j in range(self.canais[self.pagina]):
+                    self.plotArts[self.pagina][j].set_xdata(self.copiasNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina])
             else:
                 if self.filtros[self.pagina] != True:
                     self.copiasCruas[self.pagina] = self.sts[self.pagina].copy().normalize(1)
-                    self.copiasCruas[self.pagina].filter("lowpass", freq = self.freqLP[self.pagina])
+                    self.copiasCruas[self.pagina].filter("lowpass", freq = self.freqLP[self.pagina], zerophase = True)
                     self.statusPB.configure(text = 'Low pass: %.2f Hz'%self.freqLP[self.pagina])
                     self.freqLP[self.pagina] = self.freqLP[self.pagina]*self.fatorLP
                 else:
-                    self.copiasCruas[self.pagina].filter("lowpass", freq = self.freqLP[self.pagina])
+                    self.copiasCruas[self.pagina].filter("lowpass", freq = self.freqLP[self.pagina], zerophase = True)
                     self.statusPB.configure(text = 'Low pass: %.2f Hz'%self.freqLP[self.pagina])
-                    self.freqLP[self.pagina] = self.freqLP[self.pagina]*self.fatorLP            
-                for j in range(self.canais):
-                    self.plotArts[self.pagina][j].set_xdata(self.copiasCruas[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx)
-            self.filtrosLP[self.pagina] = True        
+                    self.freqLP[self.pagina] = self.freqLP[self.pagina]*self.fatorLP
+                for j in range(self.canais[self.pagina]):
+                    self.plotArts[self.pagina][j].set_xdata(self.copiasCruas[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina])
+            self.filtrosLP[self.pagina] = True
             self.filtros[self.pagina] = True
             self.conferidorIndividual()
             self.telas[self.pagina].draw()
@@ -1103,27 +1116,27 @@ class Sispick(Frame):
             if self.normalizado == True:
                 if self.filtros[self.pagina] != True:
                     self.copiasNorms[self.pagina] = self.sts[self.pagina].copy().normalize()
-                    self.copiasNorms[self.pagina].filter("highpass", freq = self.freqHP[self.pagina])
+                    self.copiasNorms[self.pagina].filter("highpass", freq = self.freqHP[self.pagina], zerophase = True)
                     self.statusPA.configure(text = 'High pass: %.2f Hz'%self.freqHP[self.pagina])
                     self.freqHP[self.pagina] = self.freqHP[self.pagina]*self.fatorHP
                 else:
-                    self.copiasNorms[self.pagina].filter("highpass", freq = self.freqHP[self.pagina])
+                    self.copiasNorms[self.pagina].filter("highpass", freq = self.freqHP[self.pagina], zerophase = True)
                     self.statusPA.configure(text = 'High pass: %.2f Hz'%self.freqHP[self.pagina])
-                    self.freqHP[self.pagina] = self.freqHP[self.pagina]*self.fatorHP         
-                for j in range(self.canais):
-                    self.plotArts[self.pagina][j].set_xdata(self.copiasNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx)
+                    self.freqHP[self.pagina] = self.freqHP[self.pagina]*self.fatorHP
+                for j in range(self.canais[self.pagina]):
+                    self.plotArts[self.pagina][j].set_xdata(self.copiasNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina])
             else:
                 if self.filtros[self.pagina] != True:
                     self.copiasCruas[self.pagina] = self.sts[self.pagina].copy().normalize(1)
-                    self.copiasCruas[self.pagina].filter("highpass", freq = self.freqHP[self.pagina])
+                    self.copiasCruas[self.pagina].filter("highpass", freq = self.freqHP[self.pagina], zerophase = True)
                     self.statusPA.configure(text = 'High pass: %.2f Hz'%self.freqHP[self.pagina])
                     self.freqHP[self.pagina] = self.freqHP[self.pagina]*self.fatorHP
                 else:
-                    self.copiasCruas[self.pagina].filter("highpass", freq = self.freqHP[self.pagina])
+                    self.copiasCruas[self.pagina].filter("highpass", freq = self.freqHP[self.pagina], zerophase = True)
                     self.statusPA.configure(text = 'High pass: %.2f Hz'%self.freqHP[self.pagina])
-                    self.freqHP = self.freqHP[self.pagina]*self.fatorHP         
-                for j in range(self.canais):
-                    self.plotArts[self.pagina][j].set_xdata(self.copiasCruas[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx)
+                    self.freqHP = self.freqHP[self.pagina]*self.fatorHP
+                for j in range(self.canais[self.pagina]):
+                    self.plotArts[self.pagina][j].set_xdata(self.copiasCruas[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina])
             self.filtrosHP[self.pagina] = True
             self.filtros[self.pagina] = True
             self.conferidorIndividual()
@@ -1132,55 +1145,56 @@ class Sispick(Frame):
     def salvargp(self):
 
         if not self.picks[:]:
-            messagebox.showerror('Refrapy - Sispick','Nao há picks')
+            messagebox.showerror('Refrapy - Sispick','No picks available')
         else:
             try:
-                arquivoSaida = filedialog.asksaveasfilename(title='Salvar',filetypes=[('Refrapy pick', '*.rp')])
+                arquivoSaida = filedialog.asksaveasfilename(title='Save',filetypes=[('Refrapy pick', '*.rp')])
                 if platform.system() == 'Windows':
                     with open(arquivoSaida+'.rp','a') as arqpck:
-                        arqpck.write("%d %d\n%.2f %.2f\n"%(len(self.listSource),self.canais,self.posicaoGeof1,self.valordx))
-                        for i in range(len(self.arquivos)):       
-                            for key in sorted(self.picks[i]):   
-                                arqpck.write('%f %f 1\n'%(key,self.picks[i][key]))    
+                        arqpck.write("%d %d\n%.2f %.2f\n"%(len(self.listSource),self.canais[0],self.posicaoGeof1[0],self.valordx[0]))
+                        for i in range(len(self.arquivos)):
+                            for key in sorted(self.picks[i]):
+                                arqpck.write('%f %f 1\n'%(key,self.picks[i][key]))
                             arqpck.write('/ %f\n'%(float(self.listSource[i])))
                     arqpck.close()
-                elif platform.system() == 'Linux':
+                elif platform.system() != 'Windows':
                     with open(arquivoSaida,'a') as arqpck:
-                        for i in range(len(self.arquivos)):       
-                            for key in sorted(self.picks[i]):    
-                                arqpck.write('%f %f 1\n'%(key,self.picks[i][key])) 
+                        arqpck.write("%d %d\n%.2f %.2f\n"%(len(self.listSource),self.canais[0],self.posicaoGeof1[0],self.valordx[0]))
+                        for i in range(len(self.arquivos)):
+                            for key in sorted(self.picks[i]):
+                                arqpck.write('%f %f 1\n'%(key,self.picks[i][key]))
                             arqpck.write('/ %f\n'%(float(self.listSource[i])))
-                    arqpck.close()  
-                messagebox.showinfo('Refrapy - Sispick','Pick salvo')
+                    arqpck.close()
+                messagebox.showinfo('Refrapy - Sispick','Picks Saved')
             except:
                 pass
 
     def salvarpick(self):
 
         if not self.picks[:]:
-            messagebox.showerror('Refrapy - Sispick','Nao há picks')
-        else:  
-            try:   
-                arquivoSaida = filedialog.asksaveasfilename(title='Salvar',filetypes=[('Seisimager', '.vs')])
+            messagebox.showerror('Refrapy - Sispick','No picks available')
+        else:
+            try:
+                arquivoSaida = filedialog.asksaveasfilename(title='Save',filetypes=[('Seisimager', '.vs')])
                 if platform.system() == 'Windows':
                     with open(arquivoSaida+'.vs','a') as arqpck:
-                        arqpck.write('1996 0 3.0\n0 %d %f\n'%(len(self.arquivos),self.valordx))
+                        arqpck.write('1996 0 3.0\n0 %d %f\n'%(len(self.arquivos),self.valordx[0]))
                         for i in range(len(self.arquivos)):
-                            arqpck.write('%f %d 0.0\n'%(float(self.listSource[i]), self.canais))     
-                            for key in sorted(self.picks[i]):    
+                            arqpck.write('%f %d 0.0\n'%(float(self.listSource[i]), self.canais[0]))
+                            for key in sorted(self.picks[i]):
                                 arqpck.write('%f %f 1 \n'%(key,self.picks[i][key]))
                         arqpck.write('0 0 \n 0 \n 0 0 \n')
                     arqpck.close()
-                elif platform.system() == 'Linux':
+                elif platform.system() != 'Windows':
                     with open(arquivoSaida,'a') as arqpck:
-                        arqpck.write('1996 0 3.0\n0 %d %f\n'%(len(self.arquivos),self.valordx))
+                        arqpck.write('1996 0 3.0\n0 %d %f\n'%(len(self.arquivos),self.valordx[0]))
                         for i in range(len(self.arquivos)):
-                            arqpck.write('%f %d 0.0\n'%(float(self.listSource[i]), self.canais))     
-                            for key in sorted(self.picks[i]):    
+                            arqpck.write('%f %d 0.0\n'%(float(self.listSource[i]), self.canais[0]))
+                            for key in sorted(self.picks[i]):
                                 arqpck.write('%f %f 1 \n'%(key,self.picks[i][key]))
                         arqpck.write('0 0 \n 0 \n 0 0 \n')
-                    arqpck.close()  
-                messagebox.showinfo('Refrapy - Sispick','Pick salvo')
+                    arqpck.close()
+                messagebox.showinfo('Refrapy - Sispick','Picks saved')
             except:
                 pass
 
@@ -1188,7 +1202,7 @@ class Sispick(Frame):
 
         if self.plotExiste == True:
             if self.pickVelOn == False:
-                self.statusVel.configure(text = 'Velocidade aparente ativada',fg='blue')
+                self.statusVel.configure(text = 'Apparent velocity active',fg='blue')
                 def clicar(event):
                     try:
                         self.coordsx[self.pagina].append(event.xdata)
@@ -1239,7 +1253,7 @@ class Sispick(Frame):
                         self.figs[i].canvas.mpl_disconnect(self.conPickSoltar[i])
                         self.conPickClick[i] = None
                         self.conPickMov[i] = None
-                        self.conPickSoltar[i] = None  
+                        self.conPickSoltar[i] = None
                     self.pickMode = False
                     self.statusPick.configure(text='',fg='blue')
                 if self.pickAmostraAtivado == True:
@@ -1268,32 +1282,32 @@ class Sispick(Frame):
                     self.conVelSoltar[i] = None
                     for j,k in zip(self.linhasVel[i],self.textoVel[i]):
                         j.remove()
-                        k.remove()   
+                        k.remove()
                     self.figs[i].canvas.draw()
-                for i in range(len(self.arquivos)): 
+                for i in range(len(self.arquivos)):
                     del self.linhasVel[i][:]
-                    del self.textoVel[i][:]    
+                    del self.textoVel[i][:]
 
     def pickAmostra(self):
 
         if self.plotExiste == True:
-            self.statusCortador.configure(text=' Corte ativado', fg='blue')
+            self.statusCortador.configure(text=' Cut active', fg='blue')
             def pick(event):
                 if int((event.ydata/self.sts[0][0].stats.delta)/1000) <= int(len(self.sts[0][0])):
                     marcador = self.axes[self.pagina].hlines(event.ydata,float(self.axes[0].get_xlim()[0]),
                                             float(self.axes[0].get_xlim()[1]),colors='r',linestyle='--',
                                             alpha = 1,linewidth = 3)
                     self.figs[self.pagina].canvas.draw()
-                    if messagebox.askyesno('Refrapy - Sispick', 'Cortar o plot para %d ms?'%int(event.ydata)):
+                    if messagebox.askyesno('Refrapy - Sispick', 'Cut at %d ms?'%int(event.ydata)):
                         marcador.remove()
                         self.ndados[self.pagina] = int((event.ydata/self.sts[0][0].stats.delta)/1000)
                         if self.normalizado == True:
-                            for j in range(self.canais):
-                                self.plotArts[self.pagina][j].set_data(self.dadosNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx,
+                            for j in range(self.canais[self.pagina]):
+                                self.plotArts[self.pagina][j].set_data(self.dadosNorms[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina],
                                                              [self.sts[self.pagina][0].stats.delta*k*1000 for k in range(int(self.ndados[self.pagina]))])
                         else:
-                            for j in range(self.canais):
-                                self.plotArts[self.pagina][j].set_data(self.dadosCrus[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1+j*self.valordx,
+                            for j in range(self.canais[self.pagina]):
+                                self.plotArts[self.pagina][j].set_data(self.dadosCrus[self.pagina][j][0:self.ndados[self.pagina]]*(-1)*self.ganho[self.pagina]+self.posicaoGeof1[self.pagina]+j*self.valordx[self.pagina],
                                                              [self.sts[self.pagina][0].stats.delta*k*1000 for k in range(int(self.ndados[self.pagina]))])
                         self.axes[self.pagina].set_ylim([0,1000*(self.sts[self.pagina][0].stats.delta*self.ndados[self.pagina])])
                         if self.yinvertido == True:
@@ -1306,10 +1320,10 @@ class Sispick(Frame):
                         self.pickAmostraAtivado = False
                         self.statusCortador.configure(text='',fg='blue')
                         self.conferidorIndividual()
-                    else:                      
+                    else:
                         for i in range(len(self.arquivos)):
                             self.figs[self.pagina].canvas.mpl_disconnect(self.conAmostra[i])
-                            self.conAmostra[i] = None   
+                            self.conAmostra[i] = None
                         self.statusCortador.configure(text='',fg='blue')
                         self.pickAmostraAtivado = False
                         marcador.remove()
@@ -1332,18 +1346,18 @@ class Sispick(Frame):
                         self.figs[i].canvas.mpl_disconnect(self.conPickSoltar[i])
                         self.conPickClick[i] = None
                         self.conPickMov[i] = None
-                        self.conPickSoltar[i] = None 
+                        self.conPickSoltar[i] = None
                     self.pickMode = False
                     self.statusPick.configure(text='',fg='blue')
                 for i in range(len(self.arquivos)):
                     cid = self.figs[i].canvas.mpl_connect('button_press_event', pick)
                     self.conAmostra[i] = cid
-                self.statusCortador.configure(text='Corte ativado', fg='blue')                    
+                self.statusCortador.configure(text='Cut active', fg='blue')
                 self.pickAmostraAtivado = True
             else:
                 for i in range(len(self.arquivos)):
                     self.figs[self.pagina].canvas.mpl_disconnect(self.conAmostra[i])
-                    self.conAmostra[i] = None    
+                    self.conAmostra[i] = None
                 self.statusCortador.configure(text='', fg='blue')
                 self.pickAmostraAtivado = False
 
@@ -1358,15 +1372,15 @@ class Sispick(Frame):
             dx = StringVar()
             comp = StringVar()
             pos1 = StringVar()
-            main = Label(root, text = 'Dados do cabeçalho (%s)'%os.path.basename(self.arquivos[self.pagina]),font=("Helvetica", 14),
+            main = Label(root, text = 'Header Information (%s)'%os.path.basename(self.arquivos[self.pagina]),font=("Helvetica", 14),
                          fg='green').grid(row = 0, column = 0, sticky='w', padx = 10, pady = 10)
-            fonte = Label(root, text = 'Posição da fonte (atual: %.2f m):'%float(self.listSource[self.pagina]),font=("Helvetica", 10),
+            fonte = Label(root, text = 'Source Location (%.2f m):'%float(self.listSource[self.pagina]),font=("Helvetica", 10),
                          fg='black').grid(row = 1, column = 0, sticky='w', padx = 10, pady = 10)
-            espacamento = Label(root, text = 'Espaçamento entre geofones (atual: %.2f m):'%float(self.valordx),font=("Helvetica", 10),
+            espacamento = Label(root, text = 'Geophone Spacing (%.2f m):'%float(self.valordx[self.pagina]),font=("Helvetica", 10),
                          fg='black').grid(row = 2, column = 0, sticky='w', padx = 10, pady = 10)
-            comp = Label(root, text = 'Comprimento do perfil (atual: %.2f m):'%(self.valordx*len(self.sts[self.pagina])),
+            comp = Label(root, text = 'Profile Length (%.2f m):'%(self.valordx[self.pagina]*(len(self.sts[self.pagina])-1)),
                          font=("Helvetica", 10),fg='black').grid(row = 3, column = 0, sticky='w', padx = 10, pady = 10)
-            pos = Label(root, text = 'Posiçao do primeiro geofone (atual: %.2f m):'%self.posicaoGeof1,
+            pos = Label(root, text = 'Location of first geophone (%.2f m):'%self.posicaoGeof1[self.pagina],
                            font=("Helvetica", 10),fg='black').grid(row = 4, column = 0, sticky='w', padx = 10, pady = 10)
             entryf = Entry(root, textvariable = fonte, width=10)
             entryf.grid(row = 1, column = 0, sticky = 'w', pady = 10, padx = 250)
@@ -1378,67 +1392,68 @@ class Sispick(Frame):
             entrypos1.grid(row = 4, column = 0, sticky = 'w', pady = 10, padx = 290)
             warning = Label(root, text = ' ', fg = 'red',font=("Helvetica", 12))
             warning.grid(row = 6, column = 0, sticky = 'w', padx = 100, pady= 10)
-            
+
             def salvar():
 
                 if len(entryf.get()) > 0:
                     try:
                         self.listSource[self.pagina] = float(entryf.get())
-                        warning.configure(text = 'Dados salvos', fg = 'blue') 
+                        warning.configure(text = 'Data saved', fg = 'blue')
                     except:
-                        warning.configure(text = 'Posição de fonte inválida', fg = 'red')
-                if len(entrydx.get()) > 0:  
+                        warning.configure(text = 'Invalid source location', fg = 'red')
+                if len(entrydx.get()) > 0:
                     try:
-                        self.valordx = float(entrydx.get())
-                        self.okpicks = [self.posicaoGeof1+self.valordx*j for j in range(self.canais)]
-                        warning.configure(text = 'Dados salvos', fg = 'blue')
+                        self.ganho[self.pagina]*=float(entrydx.get())/self.valordx[self.pagina]
+                        self.valordx[self.pagina] = float(entrydx.get())
+                        self.okpicks[self.pagina] = [self.posicaoGeof1[self.pagina]+self.valordx[self.pagina]*j for j in range(self.canais[self.pagina])]
+                        warning.configure(text = 'Data saved', fg = 'blue')
                         if self.normalizado == True:
                             for i in range(len(self.arquivos)):
-                                for j in range(self.canais):
-                                    self.plotArts[i][j].set_data(self.dadosNorms[i][j][0:self.ndados[i]]*(-1)*self.ganho[i]+self.posicaoGeof1+j*self.valordx,
+                                for j in range(self.canais[i]):
+                                    self.plotArts[i][j].set_data(self.dadosNorms[i][j][0:self.ndados[i]]*(-1)*self.ganho[i]+self.posicaoGeof1[i]+j*self.valordx[i],
                                                                  [self.sts[i][0].stats.delta*1000*k for k in range(int(self.ndados[i]))])
-                                self.axes[i].set_xlim(self.posicaoGeof1-self.valordx,self.posicaoGeof1+self.valordx*len(self.sts[i]))        
+                                self.axes[i].set_xlim(self.posicaoGeof1[i]-self.valordx[i],self.posicaoGeof1[i]+self.valordx[i]*len(self.sts[i]))
                         else:
                             for i in range(len(self.arquivos)):
-                                for j in range(self.canais):
-                                    self.plotArts[i][j].set_data(self.dadosCrus[i][j][0:self.ndados[i]]*(-1)*self.ganho[i]+self.posicaoGeof1+j*self.valordx,
+                                for j in range(self.canais[i]):
+                                    self.plotArts[i][j].set_data(self.dadosCrus[i][j][0:self.ndados[i]]*(-1)*self.ganho[i]+self.posicaoGeof1[i]+j*self.valordx[i],
                                                                  [self.sts[i][0].stats.delta*k*1000 for k in range(int(self.ndados[i]))])
-                                self.axes[i].set_xlim(self.posicaoGeof1-self.valordx,self.posicaoGeof1+self.valordx*len(self.sts[i]))
-                        self.conferidorGeral()    
+                                self.axes[i].set_xlim(self.posicaoGeof1[i]-self.valordx[i],self.posicaoGeof1[i]+self.valordx[i]*len(self.sts[i]))
+                        self.conferidorGeral()
                     except:
-                        warning.configure(text = 'Espaçamento entre geofones inválido', fg = 'red')
-                if len(entrycomp.get()) > 0: 
+                        warning.configure(text = 'Invalid geophone location', fg = 'red')
+                if len(entrycomp.get()) > 0:
                     try:
-                        warning.configure(text = 'Dados salvos', fg = 'blue')
+                        warning.configure(text = 'Data saved', fg = 'blue')
                         for i in range(len(self.arquivos)):
                             plt.figure(i)
-                            self.axes[i].set_xlim(self.posicaoGeof1-self.valordx,self.posicaoGeof1+float(entrycomp.get()))
-                            self.telas[i].draw()    
+                            self.axes[i].set_xlim(self.posicaoGeof1[i]-self.valordx[i],self.posicaoGeof1[i]+float(entrycomp.get()))
+                            self.telas[i].draw()
                     except:
-                        warning.configure(text = 'Comprimento de perfil inválido', fg = 'red')
+                        warning.configure(text = 'Invalid profile length', fg = 'red')
                 if len(entrypos1.get()) > 0:
-                    self.posicaoGeof1 = float(entrypos1.get())
-                    self.okpicks = [self.posicaoGeof1+self.valordx*j for j in range(self.canais)]
+                    self.posicaoGeof1[self.pagina] = float(entrypos1.get())
+                    self.okpicks[self.pagina] = [self.posicaoGeof1[self.pagina]+self.valordx[self.pagina]*j for j in range(self.canais[self.pagina])]
                     if self.normalizado == True:
                         for i in range(len(self.arquivos)):
-                            for j in range(self.canais):
-                                self.plotArts[i][j].set_data(self.dadosNorms[i][j][0:self.ndados[i]]*(-1)*self.ganho[i]+self.posicaoGeof1+j*self.valordx,
+                            for j in range(self.canais[i]):
+                                self.plotArts[i][j].set_data(self.dadosNorms[i][j][0:self.ndados[i]]*(-1)*self.ganho[i]+self.posicaoGeof1[i]+j*self.valordx[i],
                                                              [self.sts[i][0].stats.delta*1000*k for k in range(int(self.ndados[i]))])
-                            self.axes[i].set_xlim(self.posicaoGeof1-self.valordx,self.posicaoGeof1+self.valordx*len(self.sts[i]))    
+                            self.axes[i].set_xlim(self.posicaoGeof1[i]-self.valordx[i],self.posicaoGeof1[i]+self.valordx[i]*len(self.sts[i]))
                     else:
                         for i in range(len(self.arquivos)):
-                            for j in range(self.canais):
-                                self.plotArts[i][j].set_data(self.dadosCrus[i][j][0:self.ndados[i]]*(-1)*self.ganho[i]+self.posicaoGeof1+j*self.valordx,
+                            for j in range(self.canais[i]):
+                                self.plotArts[i][j].set_data(self.dadosCrus[i][j][0:self.ndados[i]]*(-1)*self.ganho[i]+self.posicaoGeof1[i]+j*self.valordx[i],
                                                              [self.sts[i][0].stats.delta*k*1000 for k in range(int(self.ndados[i]))])
-                            self.axes[i].set_xlim(self.posicaoGeof1-self.valordx,self.posicaoGeof1+self.valordx*len(self.sts[i]))
+                            self.axes[i].set_xlim(self.posicaoGeof1[i]-self.valordx[i],self.posicaoGeof1[i]+self.valordx[i]*len(self.sts[i]))
                     self.conferidorGeral()
 
             def fechar():
                 root.destroy()
 
-            save = Button(root, text = 'Salvar',font=("Helvetica", 12), width = 6,
+            save = Button(root, text = 'Save',font=("Helvetica", 12), width = 6,
                     command = salvar).grid(row = 5, column = 0, sticky = 'w', padx = 80, pady = 10)
-            fechar = Button(root, text = 'Fechar',font=("Helvetica", 12), width = 6,
+            fechar = Button(root, text = 'Close',font=("Helvetica", 12), width = 6,
                     command = fechar).grid(row = 5, column = 0, sticky = 'w', padx = 220, pady = 10)
             root.mainloop()
 
@@ -1450,16 +1465,16 @@ class Sispick(Frame):
             root.title('Refrapy - Sispick')
             vardx = StringVar()
             varY = StringVar()
-            varGain = StringVar()    
+            varGain = StringVar()
             varFigx = StringVar()
             varFigy = StringVar()
-            mainLabel = Label(root, text='Configurações de plot',
+            mainLabel = Label(root, text='Configure plot',
                         font=("Helvetica", 14),fg='green').grid(row=0, column=0, sticky="w",pady=15,padx=110)
-            labelY = Label(root, text='Fator de corte temporal (atual: %.1f): '%self.fatorY,
+            labelY = Label(root, text='Time cut factor (%.1f): '%self.fatorY,
                            font=("Helvetica", 10)).grid(row=1, column=0, sticky="w",padx=20,pady=10)
             entryY = Entry(root, textvariable = varY,width=10)
             entryY.grid(row=1, column=0, sticky="w",padx=235,pady=10)
-            labelGain = Label(root, text='Fator de ganho (atual: %.1f): '%self.valorGanho,
+            labelGain = Label(root, text='Gain (%.1f): '%self.valorGanho,
                               font=("Helvetica", 10)).grid(row=2, column=0, sticky="w",padx=20,pady=10)
             entryGain = Entry(root, textvariable = varGain,width=10)
             entryGain.grid(row=2, column=0, sticky="w",padx=235,pady=10)
@@ -1478,50 +1493,50 @@ class Sispick(Frame):
 
                 self.optAberto = False
                 root.destroy()
-                
+
             def do():
 
                 if len(entryY.get()) > 0:
                     try:
                         self.fatorY = float(entryY.get())
-                        warning.configure(text='Configurações aplicadas',fg = 'blue')
+                        warning.configure(text='Settings applied',fg = 'blue')
                     except:
-                        warning.configure(text='Corte temporal inválido',fg = 'red')
+                        warning.configure(text='Invalid term',fg = 'red')
                 if len(entryGain.get()) > 0:
                     try:
                         self.valorGanho = float(entryGain.get())
-                        warning.configure(text='Configurações aplicadas',fg = 'blue')
+                        warning.configure(text='Settings applied',fg = 'blue')
                     except:
-                        warning.configure(text='Fator de ganho inválido',fg = 'red')
+                        warning.configure(text='Invalid gain factor',fg = 'red')
                 '''if len(entryFigx.get()) > 0:
                     try:
                         self.valorFigx = float(entryFigx.get())
-                        warning.configure(text='Configurações aplicadas',fg = 'blue')
+                        warning.configure(text='Settings applied',fg = 'blue')
                         for i in range(len(self.arquivos)):
                             plt.figure(i)
                             plt.gcf().set_size_inches(self.valorFigx, self.valorFigy,forward=True)
                             self.figs[i].canvas.draw()
                     except:
-                        warning.configure(text='Tamanho x inválido',fg = 'red')
+                        warning.configure(text='Invalid X-dimension',fg = 'red')
                 if len(entryFigy.get()) > 0:
                     try:
                         self.valorFigy = float(entryFigy.get())
-                        warning.configure(text='Configurações aplicadas',fg = 'blue')
+                        warning.configure(text='Settings applied',fg = 'blue')
                         for i in range(len(self.arquivos)):
                             plt.figure(i)
                             plt.gcf().set_size_inches(self.valorFigx, self.valorFigy,forward=True)
                             self.figs[i].canvas.draw()
                     except:
-                         warning.configure(text='Tamanho y inválido',fg = 'red')'''
+                         warning.configure(text='Invalid Y-dimension',fg = 'red')'''
 
             def cancelar():
 
                 self.optAberto = False
                 root.destroy()
 
-            botaoOK = Button(root, text='Aplicar', bg = 'gray90',fg='black', activebackground = 'gray93',
+            botaoOK = Button(root, text='Apply', bg = 'gray90',fg='black', activebackground = 'gray93',
                             activeforeground = 'black',width=8, command = do).grid(row=5, column=0, sticky="w",pady=20,padx=110)
-            botaoX = Button(root, text='Fechar', bg = 'gray90',fg='black', activebackground = 'gray93',
+            botaoX = Button(root, text='Close', bg = 'gray90',fg='black', activebackground = 'gray93',
                             activeforeground = 'black',width=8, command = cancelar).grid(row=5, column=0, sticky="w",padx=260,pady=20)
             root.bind('<Return>', lambda x: do())
             root.resizable(0,0)
@@ -1529,43 +1544,43 @@ class Sispick(Frame):
             self.optAberto = True
             root.mainloop()
 
-    def configDx(self):                 
-        
-        root = Tk()   
+    def configDx(self):
+
+        root = Tk()
         root.geometry('455x230+500+250')
         root.title('Refrapy - Sispick')
         vardx = StringVar()
-        mainLabel = Label(root, text='O espaçamento entre geofones não foi encontrado no cabeçalho\ndo arquivo. Insira manualmente no campo abaixo',
+        mainLabel = Label(root, text='O Spacing between geophones was not found in the \ file header. Enter manually in the field below',
                     font=("Helvetica", 11),fg='red').grid(row=0, column=0, sticky="w",pady=15,padx=5)
-        labeldx = Label(root, text='Espaçamento entre geofones (metros): ',
+        labeldx = Label(root, text='Geophone spacing (metres): ',
                     font=("Helvetica", 12)).grid(row=2, column=0, sticky="w",padx=20,pady=10)
         entrydx = Entry(root, textvariable = vardx,width=10)
         entrydx.grid(row=2, column=0, sticky="w",padx=310,pady=10)
         warning = Label(root, text = '', fg = 'red',font=("Helvetica", 12))
         warning.grid(row = 6, column = 0, sticky = 'w', pady = 5, padx = 180)
-        
+
         def do():
-            
+
             if len(entrydx.get()) > 0:
                 try:
-                    self.valordx = float(entrydx.get())
+                    self.valordx[self.pagina] = float(entrydx.get())
                     root.destroy()
                     self.abrir_pt2()
-                except: 
-                    warning.configure(text = 'Valor inválido')
+                except:
+                    warning.configure(text = 'Value invalid')
             else:
-                messagebox.showinfo('Refrapy - Sispick', 'Espaçamento entre geofones padrão será usado: 2 m')
-                self.valordx = 2
+                messagebox.showinfo('Refrapy - Sispick', 'Geophone spacing set to: 2 m')
+                self.valordx[self.pagina] = 2
                 root.destroy()
                 self.abrir_pt2()
-                                    
+
         def cancelar():
 
-            messagebox.showinfo('Refrapy - Sispick', 'Espaçamento entre geofones padrão será usado: 2 m')
-            self.valordx = 2
+            messagebox.showinfo('Refrapy - Sispick', 'Geophone spacing set to: 2 m')
+            self.valordx[self.pagina] = 2
             root.destroy()
             self.abrir_pt2()
-        
+
         botaoOK = Button(root, text='   Ok   ', bg = 'gray90',fg='black', activebackground = 'gray93',
                         activeforeground = 'black',width=8, command = do).grid(row=5, column=0, sticky="w",pady=20,padx=110)
         botaoX = Button(root, text='Ignorar', bg = 'gray90',fg='black', activebackground = 'gray93',
